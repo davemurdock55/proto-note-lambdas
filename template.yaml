@@ -14,6 +14,7 @@ Globals:
     LoggingConfig:
       LogFormat: JSON
 Resources:
+  # Hello World function
   HelloWorldFunction:
     Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
     Properties:
@@ -40,6 +41,35 @@ Resources:
           - app.ts
         External:
           - commons
+
+  # Second Hello World function
+  SecondHelloWorldFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/second-hello-world/
+      Handler: app.handler
+      Runtime: nodejs22.x
+      Architectures:
+        - x86_64
+      Events:
+        SecondHelloWorld:
+          Type: Api
+          Properties:
+            Path: /second-hello
+            Method: get
+      Layers:
+        - !Ref LayerCommons
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: es2021
+        Sourcemap: true
+        EntryPoints:
+          - app.ts
+        External:
+          - commons
+
   # Inside Resources
   LayerCommons:
     Type: AWS::Serverless::LayerVersion
@@ -55,6 +85,8 @@ Outputs:
   # ServerlessRestApi is an implicit API created out of Events key under Serverless::Function
   # Find out more about other implicit resources you can reference within SAM
   # https://github.com/awslabs/serverless-application-model/blob/master/docs/internals/generated_resources.rst#api
+
+  # Hello World function
   HelloWorldApi:
     Description: API Gateway endpoint URL for Prod stage for Hello World function
     Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/hello/"
@@ -64,3 +96,14 @@ Outputs:
   HelloWorldFunctionIamRole:
     Description: Implicit IAM Role created for Hello World function
     Value: !GetAtt HelloWorldFunctionRole.Arn
+
+  # Second Hello World function
+  HelloWorld2Api:
+    Description: API Gateway endpoint URL for Prod stage for Second Hello World function
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/second-hello/"
+  SecondHelloWorldFunction:
+    Description: Second Hello World Lambda Function ARN
+    Value: !GetAtt SecondHelloWorldFunction.Arn
+  SecondHelloWorldFunctionIamRole:
+    Description: Implicit IAM Role created for Second Hello World function
+    Value: !GetAtt SecondHelloWorldFunctionRole.Arn

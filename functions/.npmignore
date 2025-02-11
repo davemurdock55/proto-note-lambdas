@@ -1,0 +1,11 @@
+# Ignore test files
+tests/*
+
+# Ignore build output
+dist/*
+
+# Ignore node_modules
+node_modules/*
+
+# Ignore SAM build artifacts
+.aws-sam/*
