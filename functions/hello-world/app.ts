@@ -1,5 +1,5 @@
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
-import { responseBuilder } from 'commons';
+import { sendResponse } from 'commons';
 
 /**
  *
@@ -14,20 +14,9 @@ import { responseBuilder } from 'commons';
 export const lambdaHandler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
     try {
         console.log('event', event);
-        return responseBuilder({ message: 'hello world' });
-        // return {
-        //     statusCode: 200,
-        //     body: JSON.stringify({
-        //         message: 'hello world',
-        //     }),
-        // };
+        return sendResponse({ message: 'hello world 2' });
     } catch (err) {
         console.log(err);
-        return {
-            statusCode: 500,
-            body: JSON.stringify({
-                message: 'some error happened',
-            }),
-        };
+        return sendResponse({ message: 'some error happened' }, 500);
     }
 };
