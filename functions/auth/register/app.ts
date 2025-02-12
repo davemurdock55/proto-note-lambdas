@@ -55,9 +55,16 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
     };
 
     // Saving the new user to the database
-    const saveUserResponse = await saveUser(newUser);
-    if (!saveUserResponse) return sendResponse({ message: 'Server Error: Please try again later' }, 400);
-
+    try {
+        const saveUserResponse = await saveUser(newUser);
+        if (!saveUserResponse) {
+            console.error('Error saving user:', saveUserResponse);
+            return sendResponse({ message: 'Server Error: Please try again later' }, 400);
+        }
+    } catch (error) {
+        console.error('Error saving user:', error);
+        return sendResponse({ message: 'Server Error: Please try again later' }, 500);
+    }
     // Responding with a success message
     return sendResponse({ message: 'User registered successfully' });
 };

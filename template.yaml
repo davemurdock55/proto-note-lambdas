@@ -61,6 +61,9 @@ Resources:
       Layers:
         - !Ref LayerCommons
         - !Ref LayerAuth
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: login-database
     Metadata: # Manage esbuild properties
       BuildMethod: esbuild
       BuildProperties:
@@ -91,6 +94,9 @@ Resources:
       Layers:
         - !Ref LayerCommons
         - !Ref LayerAuth
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: login-database
     Metadata: # Manage esbuild properties
       BuildMethod: esbuild
       BuildProperties:
@@ -121,6 +127,9 @@ Resources:
       Layers:
         - !Ref LayerCommons
         - !Ref LayerAuth
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: login-database
     Metadata: # Manage esbuild properties
       BuildMethod: esbuild
       BuildProperties:
@@ -151,6 +160,9 @@ Resources:
       Layers:
         - !Ref LayerCommons
         - !Ref LayerAuth
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: login-database
     Metadata: # Manage esbuild properties
       BuildMethod: esbuild
       BuildProperties:
