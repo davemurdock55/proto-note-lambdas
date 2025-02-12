@@ -24,39 +24,40 @@ const registerBodySchema = z.object({
 });
 
 export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
-    console.log('***1 Made it to the register function***');
-    console.log('event: ', event);
+    // Making sure the request has a body
     if (!event.body) {
         return sendResponse({ message: 'Invalid request: No body provided' }, 400);
     }
 
-    console.log('Raw body:', event.body);
+    // Parsing the request body
     const body = JSON.parse(event.body);
-    console.log('Parsed body:', body);
 
-    console.log('***2 About to validate the request body***');
-    // validating the body's types and if the body contains those types
+    // Validating if the request body matches the Zod Schema
     try {
         validateRequestBody(body, registerBodySchema);
     } catch (error) {
         return sendResponse({ message: (error as Error).message }, 400);
     }
-    console.log('***3 Finished validating the request body***');
-    console.log('body: ', body);
 
-    console.log('***4 About to finish function (find user in DB, hash, etc.)***');
+    // Checking if the user already exists
     const foundUser = await getUser(body.username);
     if (foundUser && foundUser.username) {
         return sendResponse({ message: 'User already exists' }, 400);
     }
 
+    // Hashing the password
     const hashedPass = bcrypt.hashSync(body.password.trim(), SALT_ROUND);
-    const newUser = {
+    // Creating the new User object (to be sent to the database)
+    const newUser: User = {
         name: body.name,
         username: body.username,
         password: hashedPass,
     };
+
+    // Saving the new user to the database
     const saveUserResponse = await saveUser(newUser);
     if (!saveUserResponse) return sendResponse({ message: 'Server Error: Please try again later' }, 400);
+
+    // Responding with a success message
     return sendResponse({ message: 'User registered successfully' });
 };
