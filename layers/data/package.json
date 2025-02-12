@@ -3,6 +3,9 @@
   "main": "index.ts",
   "name": "layer-data",
   "version": "1.0.0",
+  "dependencies": {
+    "aws-sdk": "^2.1692.0"
+  },
   "devDependencies": {
     "@types/node": "^20.5.7",
     "typescript": "^5.0.3"

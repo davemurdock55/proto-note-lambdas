@@ -15,6 +15,15 @@ Globals:
       LogFormat: JSON
 
 Resources:
+  # The Authorizer Resource
+  MyAuthorizer:
+    Type: AWS::ApiGateway::Authorizer
+    Properties:
+      Name: WikiRealmsTokenAuthorizer
+      Type: TOKEN
+      IdentitySource: method.request.header.Authorization
+      RestApiId: !Ref ServerlessRestApi
+      AuthorizerUri: arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/arn:aws:lambda:us-east-1:018653395194:function:VerifyFunction/invocations
   # Hello World function
   HelloWorldFunction:
     Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
@@ -30,6 +39,8 @@ Resources:
           Properties:
             Path: /hello
             Method: get
+            Auth:
+              Authorizer: WikiRealmsTokenAuthorizer
       Layers:
         - !Ref LayerCommons
     Metadata: # Manage esbuild properties
@@ -53,7 +64,7 @@ Resources:
       Architectures:
         - x86_64
       Events:
-        Login:
+        Register:
           Type: Api
           Properties:
             Path: /auth/register
@@ -119,11 +130,13 @@ Resources:
       Architectures:
         - x86_64
       Events:
-        Login:
+        Logout:
           Type: Api
           Properties:
             Path: /auth/logout
             Method: post
+            Auth:
+              Authorizer: WikiRealmsTokenAuthorizer
       Layers:
         - !Ref LayerCommons
         - !Ref LayerAuth
@@ -152,7 +165,7 @@ Resources:
       Architectures:
         - x86_64
       Events:
-        Login:
+        Verify:
           Type: Api
           Properties:
             Path: /auth/verify
