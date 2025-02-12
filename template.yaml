@@ -108,6 +108,9 @@ Resources:
       Policies:
         - DynamoDBCrudPolicy:
             TableName: login-database
+      Environment:
+        Variables:
+          JWT_SECRET: !Sub "{{resolve:secretsmanager:wiki-realms/JWT_Token:SecretString:JWT_SECRET}}"
     Metadata: # Manage esbuild properties
       BuildMethod: esbuild
       BuildProperties:
@@ -135,8 +138,6 @@ Resources:
           Properties:
             Path: /auth/logout
             Method: post
-            Auth:
-              Authorizer: WikiRealmsTokenAuthorizer
       Layers:
         - !Ref LayerCommons
         - !Ref LayerAuth

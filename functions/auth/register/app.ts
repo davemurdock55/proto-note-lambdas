@@ -1,7 +1,7 @@
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 import { sendResponse, validateRequestBody } from 'commons';
 import { User } from 'auth/types';
-import { getUser, saveUser } from 'auth';
+import { SALT_ROUND, getUser, saveUser } from 'auth';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 
@@ -14,8 +14,6 @@ import { z } from 'zod';
  * @returns {Object} object - API Gateway Lambda Proxy Output Format
  *
  */
-
-const SALT_ROUND = 8;
 
 const registerBodySchema = z.object({
     name: z.string(),
