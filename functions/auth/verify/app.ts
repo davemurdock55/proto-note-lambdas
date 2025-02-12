@@ -1,5 +1,6 @@
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 import { sendResponse } from 'commons';
+import { TestFunction } from 'data';
 
 /**
  *
@@ -12,9 +13,10 @@ import { sendResponse } from 'commons';
  */
 
 export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
-    console.log('event: ', event);
     try {
-        return sendResponse({ message: 'Okay, this actually worked!!!!' });
+        console.log('event', event);
+        console.log('TestFunction: ', TestFunction());
+        return sendResponse({ message: 'hello from verify' });
     } catch (err) {
         console.log(err);
         return sendResponse({ message: 'some error happened' }, 500);

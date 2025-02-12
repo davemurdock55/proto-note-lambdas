@@ -13,6 +13,7 @@ Globals:
     # You can add LoggingConfig parameters such as the Logformat, Log Group, and SystemLogLevel or ApplicationLogLevel. Learn more here https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/sam-resource-function.html#sam-function-loggingconfig.
     LoggingConfig:
       LogFormat: JSON
+
 Resources:
   # Hello World function
   HelloWorldFunction:
@@ -42,24 +43,25 @@ Resources:
         External:
           - commons
 
-  # Second Hello World function
-  SecondHelloWorldFunction:
+  # Register function
+  RegisterFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: functions/second-hello-world/
+      CodeUri: functions/auth/register
       Handler: app.handler
       Runtime: nodejs22.x
       Architectures:
         - x86_64
       Events:
-        SecondHelloWorld:
+        Login:
           Type: Api
           Properties:
-            Path: /second-hello
-            Method: get
+            Path: /auth/register
+            Method: post
       Layers:
         - !Ref LayerCommons
-    Metadata:
+        - !Ref LayerAuth
+    Metadata: # Manage esbuild properties
       BuildMethod: esbuild
       BuildProperties:
         Minify: true
@@ -69,14 +71,127 @@ Resources:
           - app.ts
         External:
           - commons
+          - auth
 
-  # Inside Resources
+  # Login function
+  LoginFunction:
+    Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
+    Properties:
+      CodeUri: functions/auth/login
+      Handler: app.handler
+      Runtime: nodejs22.x
+      Architectures:
+        - x86_64
+      Events:
+        Login:
+          Type: Api # More info about API Event Source: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#api
+          Properties:
+            Path: /auth/login
+            Method: post
+      Layers:
+        - !Ref LayerCommons
+        - !Ref LayerAuth
+    Metadata: # Manage esbuild properties
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: es2021
+        Sourcemap: true
+        EntryPoints:
+          - app.ts
+        External:
+          - commons
+          - auth
+
+  # Logout function
+  LogoutFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/auth/logout
+      Handler: app.handler
+      Runtime: nodejs22.x
+      Architectures:
+        - x86_64
+      Events:
+        Login:
+          Type: Api
+          Properties:
+            Path: /auth/logout
+            Method: post
+      Layers:
+        - !Ref LayerCommons
+        - !Ref LayerAuth
+    Metadata: # Manage esbuild properties
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: es2021
+        Sourcemap: true
+        EntryPoints:
+          - app.ts
+        External:
+          - commons
+          - auth
+
+  # Verify function
+  VerifyFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/auth/verify
+      Handler: app.handler
+      Runtime: nodejs22.x
+      Architectures:
+        - x86_64
+      Events:
+        Login:
+          Type: Api
+          Properties:
+            Path: /auth/verify
+            Method: post
+      Layers:
+        - !Ref LayerCommons
+        - !Ref LayerAuth
+    Metadata: # Manage esbuild properties
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: es2021
+        Sourcemap: true
+        EntryPoints:
+          - app.ts
+        External:
+          - commons
+          - auth
+
+  # Common Layer Resources
   LayerCommons:
     Type: AWS::Serverless::LayerVersion
     Properties:
       ContentUri: layers/commons/
       CompatibleRuntimes:
-        - nodejs16.x
+        - nodejs22.x
+      RetentionPolicy: Delete
+    Metadata:
+      BuildMethod: makefile
+
+  # Auth Layer
+  LayerAuth:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      ContentUri: layers/auth/
+      CompatibleRuntimes:
+        - nodejs22.x
+      RetentionPolicy: Delete
+    Metadata:
+      BuildMethod: makefile
+
+  # Data Layer
+  LayerData:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      ContentUri: layers/data/
+      CompatibleRuntimes:
+        - nodejs22.x
       RetentionPolicy: Delete
     Metadata:
       BuildMethod: makefile
@@ -97,13 +212,46 @@ Outputs:
     Description: Implicit IAM Role created for Hello World function
     Value: !GetAtt HelloWorldFunctionRole.Arn
 
-  # Second Hello World function
-  HelloWorld2Api:
-    Description: API Gateway endpoint URL for Prod stage for Second Hello World function
-    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/second-hello/"
-  SecondHelloWorldFunction:
-    Description: Second Hello World Lambda Function ARN
-    Value: !GetAtt SecondHelloWorldFunction.Arn
-  SecondHelloWorldFunctionIamRole:
-    Description: Implicit IAM Role created for Second Hello World function
-    Value: !GetAtt SecondHelloWorldFunctionRole.Arn
+  # Register function
+  RegisterApi:
+    Description: API Gateway endpoint URL for Prod stage for Register function
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/auth/register/"
+  RegisterFunction:
+    Description: Register Lambda Function ARN
+    Value: !GetAtt RegisterFunction.Arn
+  RegisterFunctionIamRole:
+    Description: Implicit IAM Role created for Register function
+    Value: !GetAtt RegisterFunctionRole.Arn
+
+  # Login function
+  LoginApi:
+    Description: API Gateway endpoint URL for Prod stage for Login function
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/auth/login/"
+  LoginFunction:
+    Description: Login Lambda Function ARN
+    Value: !GetAtt LoginFunction.Arn
+  LoginFunctionIamRole:
+    Description: Implicit IAM Role created for Login function
+    Value: !GetAtt LoginFunctionRole.Arn
+
+  # Logout function
+  LogoutApi:
+    Description: API Gateway endpoint URL for Prod stage for Log out function
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/auth/logout/"
+  LogoutFunction:
+    Description: Log out Lambda Function ARN
+    Value: !GetAtt LogoutFunction.Arn
+  LogoutFunctionIamRole:
+    Description: Implicit IAM Role created for Log out function
+    Value: !GetAtt LogoutFunctionRole.Arn
+
+  # Verify function
+  VerifyApi:
+    Description: API Gateway endpoint URL for Prod stage for Verify function
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/auth/verify/"
+  VerifyFunction:
+    Description: Verify Lambda Function ARN
+    Value: !GetAtt VerifyFunction.Arn
+  VerifyFunctionIamRole:
+    Description: Implicit IAM Role created for Verify function
+    Value: !GetAtt VerifyFunctionRole.Arn

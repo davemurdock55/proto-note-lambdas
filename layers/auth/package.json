@@ -1,16 +1,18 @@
 {
-  "description": "Lambda layer with common utils",
+  "description": "Lambda layer with authentication utils",
   "main": "index.ts",
-  "name": "layer-commons",
+  "name": "layer-auth",
   "version": "1.0.0",
+  "dependencies": {
+    "aws-sdk": "^2.1692.0",
+    "bcryptjs": "^2.4.3",
+    "jsonwebtoken": "^9.0.2"
+  },
   "devDependencies": {
     "@types/node": "^20.5.7",
     "typescript": "^5.0.3"
   },
   "scripts": {
     "build": "node_modules/typescript/bin/tsc"
-  },
-  "dependencies": {
-    "zod": "^3.24.2"
   }
 }
