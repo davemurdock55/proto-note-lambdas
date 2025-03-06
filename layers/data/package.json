@@ -4,7 +4,8 @@
   "name": "layer-data",
   "version": "1.0.0",
   "dependencies": {
-    "aws-sdk": "^2.1692.0"
+    "@aws-sdk/client-dynamodb": "^3.400.0",
+    "@aws-sdk/lib-dynamodb": "^3.400.0"
   },
   "devDependencies": {
     "@types/node": "^20.5.7",

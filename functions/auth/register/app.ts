@@ -1,5 +1,5 @@
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
-import { sendResponse, validateRequestBody } from 'commons';
+import { sendResponse, parseAndValidateBody } from 'commons';
 import { User } from 'auth/types';
 import { SALT_ROUND, getUser, saveUser } from 'auth';
 import bcrypt from 'bcryptjs';
@@ -21,34 +21,37 @@ const registerBodySchema = z.object({
     password: z.string().min(8),
 });
 
+// Define type for register body
+type RegisterBody = z.infer<typeof registerBodySchema>;
+
 export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
-    // Making sure the request has a body
-    if (!event.body) {
-        return sendResponse({ message: 'Invalid request: No body provided' }, 400);
+    // Parse and validate in one step
+    const validatedResult = parseAndValidateBody<RegisterBody>(event, registerBodySchema, [
+        'name',
+        'username',
+        'password',
+    ]);
+
+    // If result is an error response, return it
+    if ('statusCode' in validatedResult) {
+        return validatedResult;
     }
 
-    // Parsing the request body
-    const body = JSON.parse(event.body);
-
-    // Validating if the request body matches the Zod Schema
-    try {
-        validateRequestBody(body, registerBodySchema);
-    } catch (error) {
-        return sendResponse({ message: (error as Error).message }, 400);
-    }
+    // Extract validated data
+    const { name, username, password } = validatedResult.body;
 
     // Checking if the user already exists
-    const foundUser = await getUser(body.username);
+    const foundUser = await getUser(username);
     if (foundUser && foundUser.username) {
         return sendResponse({ message: 'User already exists' }, 400);
     }
 
     // Hashing the password
-    const hashedPass = bcrypt.hashSync(body.password.trim(), SALT_ROUND);
+    const hashedPass = bcrypt.hashSync(password.trim(), SALT_ROUND);
     // Creating the new User object (to be sent to the database)
     const newUser: User = {
-        name: body.name,
-        username: body.username,
+        name: name,
+        username: username,
         password: hashedPass,
     };
 
@@ -57,7 +60,7 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
         const saveUserResponse = await saveUser(newUser);
         if (!saveUserResponse) {
             console.error('Error saving user:', saveUserResponse);
-            return sendResponse({ message: 'Server Error: Please try again later' }, 400);
+            return sendResponse({ message: 'Server Error: Please try again later' }, 500);
         }
     } catch (error) {
         console.error('Error saving user:', error);

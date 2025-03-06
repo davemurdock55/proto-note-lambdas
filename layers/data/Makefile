@@ -1,6 +1,10 @@
-.PHONY: build-LayerData
+.PHONY: build build-DataLayer # to create layer, run `make build`, then upload the zip file to AWS Lambda Layers
 
-build-LayerData:
+# ARTIFACTS_DIR := ./build
+
+build: build-DataLayer
+
+build-DataLayer:
 	npm install
 	npm run build
 	mkdir -p "$(ARTIFACTS_DIR)/nodejs/node_modules"
@@ -8,3 +12,4 @@ build-LayerData:
 	npm install --production --prefix "$(ARTIFACTS_DIR)/nodejs/" # for runtime deps
 	rm "$(ARTIFACTS_DIR)/nodejs/package.json" # for runtime deps
 	cp -r data "$(ARTIFACTS_DIR)/nodejs/node_modules"
+	cd "$(ARTIFACTS_DIR)" && zip -r layer.zip nodejs
