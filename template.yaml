@@ -231,6 +231,42 @@ Resources:
           - commons
           - auth
 
+  # Sync Notes function
+  SyncNotesFunction:
+    Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
+    Properties:
+      CodeUri: functions/notes/sync
+      Handler: app.lambdaHandler
+      Runtime: nodejs22.x
+      Architectures:
+        - x86_64
+      Events:
+        SyncNotes:
+          Type: Api # More info about API Event Source: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#api
+          Properties:
+            RestApiId: !Ref WikiRealmsApi
+            Path: /notes/sync
+            Method: post
+            Auth:
+              Authorizer: WikiRealmsTokenAuthorizer
+      Layers:
+        - !Ref CommonsLayer
+        - !Ref DataLayer
+      Environment:
+        Variables:
+          NODE_OPTIONS: " --enable-source-maps"
+    Metadata: # Manage esbuild properties
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: es2021
+        Sourcemap: true
+        EntryPoints:
+          - app.ts
+        External:
+          - commons
+          - data
+
   # Common Layer Resources
   CommonsLayer:
     Type: AWS::Serverless::LayerVersion
@@ -323,3 +359,14 @@ Outputs:
   VerifyFunctionIamRole:
     Description: Implicit IAM Role created for Verify function
     Value: !GetAtt VerifyFunctionRole.Arn
+
+  # Sync Notes function
+  SyncNotesApi:
+    Description: API Gateway endpoint URL for Prod stage for the Sync Notes function
+    Value: !Sub "https://${WikiRealmsApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/notes/sync"
+  SyncNotesFunction:
+    Description: Sync Notes Lambda Function ARN
+    Value: !GetAtt SyncNotesFunction.Arn
+  SyncNotesFunctionIamRole:
+    Description: Implicit IAM Role created for the Sync Notes function
+    Value: !GetAtt SyncNotesFunctionRole.Arn
