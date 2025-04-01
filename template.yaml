@@ -106,6 +106,7 @@ Resources:
         Register:
           Type: Api
           Properties:
+            RestApiId: !Ref WikiRealmsApi
             Path: /auth/register
             Method: post
       Layers:
@@ -139,6 +140,7 @@ Resources:
         Login:
           Type: Api # More info about API Event Source: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#api
           Properties:
+            RestApiId: !Ref WikiRealmsApi
             Path: /auth/login
             Method: post
       Layers:
@@ -175,6 +177,7 @@ Resources:
         Logout:
           Type: Api
           Properties:
+            RestApiId: !Ref WikiRealmsApi
             Path: /auth/logout
             Method: post
       Layers:
@@ -208,6 +211,7 @@ Resources:
         Verify:
           Type: Api
           Properties:
+            RestApiId: !Ref WikiRealmsApi
             Path: /auth/verify
             Method: post
       Layers:
@@ -252,6 +256,9 @@ Resources:
       Layers:
         - !Ref CommonsLayer
         - !Ref DataLayer
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: notes-database
       Environment:
         Variables:
           NODE_OPTIONS: " --enable-source-maps"

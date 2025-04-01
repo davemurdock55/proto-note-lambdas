@@ -39,7 +39,7 @@ export const lambdaHandler = async (event: APIGatewayProxyEvent): Promise<APIGat
         const { username, notes } = validatedResult.body;
 
         // Get the user's notes from the database
-        const userNotesRecord = await getRecord(NOTES_TABLE, { username });
+        const userNotesRecord = await getRecord(NOTES_TABLE, { notesTableId: username });
         const userNotes: Note[] = userNotesRecord?.notes || [];
 
         // Get the lastSyncedTime from the database record
@@ -105,6 +105,7 @@ export const lambdaHandler = async (event: APIGatewayProxyEvent): Promise<APIGat
 
         // Save the merged notes back to the database
         await putRecord(NOTES_TABLE, {
+            notesTableId: username,
             username,
             notes: mergedNotes,
             lastSyncedTime: currentTime,
