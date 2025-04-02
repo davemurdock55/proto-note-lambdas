@@ -13,9 +13,9 @@ const noteSchema = z.object({
 // Define the schema for the sync request
 const syncRequestSchema = z.object({
     username: z.string().email(),
+    deviceId: z.string(),
     notes: z.array(noteSchema),
 });
-
 // Define type for the sync request
 type SyncRequest = z.infer<typeof syncRequestSchema>;
 
@@ -35,15 +35,16 @@ export const lambdaHandler = async (event: APIGatewayProxyEvent): Promise<APIGat
             return validatedResult;
         }
 
-        // Extract validated data
-        const { username, notes } = validatedResult.body;
+        // Extract validated data - include deviceId
+        const { username, deviceId, notes } = validatedResult.body;
 
         // Get the user's notes from the database
         const userNotesRecord = await getRecord(NOTES_TABLE, { notesTableId: username });
         const userNotes: Note[] = userNotesRecord?.notes || [];
 
-        // Get the lastSyncedTime from the database record
-        const lastSyncedTime = userNotesRecord?.lastSyncedTime || 0;
+        // Get the lastSyncedTime for THIS device
+        const deviceSyncs = userNotesRecord?.deviceSyncs || {};
+        const lastSyncedTime = deviceSyncs[deviceId]?.lastSyncedTime || 0;
 
         // Current timestamp to use as the new lastSyncedTime
         const currentTime = Date.now();
@@ -56,7 +57,7 @@ export const lambdaHandler = async (event: APIGatewayProxyEvent): Promise<APIGat
         userNotes.forEach((note) => dbNotesMap.set(note.title, note));
 
         // Array to hold merged notes
-        const mergedNotes: Note[] = [];
+        let mergedNotes: Note[] = [];
 
         // Track titles that should be deleted from the database
         const deletedNoteTitles: string[] = [];
@@ -80,19 +81,35 @@ export const lambdaHandler = async (event: APIGatewayProxyEvent): Promise<APIGat
         // Handle DB notes not in client - could be deleted or new from another device
         for (const [title, dbNote] of dbNotesMap.entries()) {
             if (!clientNotesMap.has(title)) {
-                // If this is the user's first time syncing (lastSyncedTime === 0)
-                // OR if the note was edited since their last sync
+                // If this is the device's first sync (lastSyncedTime === 0)
+                // OR if the note was created/modified after this device's last sync
                 if (lastSyncedTime === 0 || dbNote.lastEditTime > lastSyncedTime) {
-                    // that means the note is a new (or modified) note and should be included
+                    // This is a new note from another device - preserve it
                     mergedNotes.push(dbNote);
+                    console.log(`Note "${title}" is new from another device, preserving`);
                 } else {
-                    // the note is older than client's last sync and client doesn't have it
-                    // This means it was likely deleted on client - track for removal
+                    // The note existed before this device's last sync but this device doesn't have it
+                    // This likely means it was intentionally deleted on this device
                     deletedNoteTitles.push(title);
-                    console.log(`Note "${title}" appears to be deleted by client, removing from DB`);
+                    console.log(`Note "${title}" appears deleted on this device, marking for deletion`);
                 }
             }
         }
+
+        // Actually remove the notes marked for deletion
+        for (const title of deletedNoteTitles) {
+            console.log(`Removing note "${title}" from the merged notes`);
+            // Filter out the deleted notes
+            mergedNotes = mergedNotes.filter((note) => note.title !== title);
+        }
+
+        // Update the database with the new deviceSync information
+        const updatedDeviceSyncs = {
+            ...deviceSyncs,
+            [deviceId]: {
+                lastSyncedTime: currentTime,
+            },
+        };
 
         // Log summary of changes
         console.log(`Sync summary for ${username}:`);
@@ -108,7 +125,7 @@ export const lambdaHandler = async (event: APIGatewayProxyEvent): Promise<APIGat
             notesTableId: username,
             username,
             notes: mergedNotes,
-            lastSyncedTime: currentTime,
+            deviceSyncs: updatedDeviceSyncs,
         });
 
         // Return the merged notes to the client
