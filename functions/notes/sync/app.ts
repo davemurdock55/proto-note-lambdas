@@ -8,6 +8,7 @@ const noteSchema = z.object({
     title: z.string(),
     content: z.string(),
     lastEditTime: z.number(),
+    createdAtTime: z.number(),
 });
 
 // Define the schema for the sync request
@@ -78,20 +79,28 @@ export const lambdaHandler = async (event: APIGatewayProxyEvent): Promise<APIGat
             }
         }
 
-        // Handle DB notes not in client - could be deleted or new from another device
+        // Handle DB notes not in client - use createdAtTime for better detection
         for (const [title, dbNote] of dbNotesMap.entries()) {
             if (!clientNotesMap.has(title)) {
-                // If this is the device's first sync (lastSyncedTime === 0)
-                // OR if the note was created/modified after this device's last sync
-                if (lastSyncedTime === 0 || dbNote.lastEditTime > lastSyncedTime) {
-                    // This is a new note from another device - preserve it
+                // Case 1: Note was created after last sync - it's new from another device
+                if (dbNote.createdAtTime > lastSyncedTime) {
+                    // This is definitely a new note from another device - preserve it
                     mergedNotes.push(dbNote);
-                    console.log(`Note "${title}" is new from another device, preserving`);
-                } else {
-                    // The note existed before this device's last sync but this device doesn't have it
-                    // This likely means it was intentionally deleted on this device
+                    console.log(`Note "${title}" is new from another device (created after last sync), preserving`);
+                }
+                // Case 2: Note existed before last sync, but was modified after last sync
+                else if (dbNote.lastEditTime > lastSyncedTime) {
+                    // The note was updated on another device after this device's last sync
+                    mergedNotes.push(dbNote);
+                    console.log(`Note "${title}" was updated on another device after last sync, preserving`);
+                }
+                // Case 3: Note existed before last sync and hasn't been modified since
+                else {
+                    // The note must have been intentionally deleted on this device
                     deletedNoteTitles.push(title);
-                    console.log(`Note "${title}" appears deleted on this device, marking for deletion`);
+                    console.log(
+                        `Note "${title}" existed at last sync, appears deleted on this device, marking for deletion`,
+                    );
                 }
             }
         }
