@@ -17,129 +17,194 @@ const syncRequestSchema = z.object({
     deviceId: z.string(),
     notes: z.array(noteSchema),
 });
+
 // Define type for the sync request
 type SyncRequest = z.infer<typeof syncRequestSchema>;
 
 // Define type for a note
 export type Note = z.infer<typeof noteSchema>;
 
+// Add this near your other type definitions
+type DeletedNote = {
+    title: string;
+    deletedAt: number;
+    acknowledgedBy: string[]; // Array of device IDs
+};
+
 // Define the table name for notes
 const NOTES_TABLE = 'notes-database';
 
 export const lambdaHandler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
     try {
-        // Parse and validate the request body
         const validatedResult = parseAndValidateBody<SyncRequest>(event, syncRequestSchema, ['username', 'notes']);
 
-        // If result is an error response, return it
         if ('statusCode' in validatedResult) {
             return validatedResult;
         }
 
-        // Extract validated data - include deviceId
         const { username, deviceId, notes } = validatedResult.body;
 
-        // Get the user's notes from the database
+        // Get user notes and device sync info
         const userNotesRecord = await getRecord(NOTES_TABLE, { notesTableId: username });
         const userNotes: Note[] = userNotesRecord?.notes || [];
-
-        // Get the lastSyncedTime for THIS device
         const deviceSyncs = userNotesRecord?.deviceSyncs || {};
-        const lastSyncedTime = deviceSyncs[deviceId]?.lastSyncedTime || 0;
+        const deletedNotes: DeletedNote[] = userNotesRecord?.deletedNotes || [];
 
-        // Current timestamp to use as the new lastSyncedTime
+        // Create a map for easier lookup
+        const deletedNotesMap = new Map<string, DeletedNote>();
+        deletedNotes.forEach((note) => deletedNotesMap.set(note.title, note));
+
+        // Current device's last sync state
+        const deviceSync = deviceSyncs[deviceId] || { lastSyncedTime: 0, previousNotes: [] };
+        const lastSyncedTime = deviceSync.lastSyncedTime;
+        const previousNoteTitles = deviceSync.previousNotes || [];
+
+        // Current timestamp
         const currentTime = Date.now();
 
-        // Create maps for easier lookup
         const clientNotesMap = new Map<string, Note>();
         notes.forEach((note) => clientNotesMap.set(note.title, note));
 
         const dbNotesMap = new Map<string, Note>();
         userNotes.forEach((note) => dbNotesMap.set(note.title, note));
 
-        // Array to hold merged notes
-        let mergedNotes: Note[] = [];
-
-        // Track titles that should be deleted from the database
+        const mergedNotes: Note[] = [];
         const deletedNoteTitles: string[] = [];
 
-        // Process notes from client
-        for (const [title, clientNote] of clientNotesMap.entries()) {
-            const dbNote = dbNotesMap.get(title);
+        // STEP 1: Detect deleted notes based on previous notes for this device
+        for (const title of previousNoteTitles) {
+            if (!clientNotesMap.has(title)) {
+                const dbNote = dbNotesMap.get(title);
+                if (!dbNote) continue;
 
+                const modifiedByOthers = dbNote.lastEditTime > lastSyncedTime;
+
+                if (!modifiedByOthers) {
+                    deletedNoteTitles.push(title);
+                    console.log(`Note "${title}" was deleted on device ${deviceId}, honoring deletion`);
+                } else {
+                    mergedNotes.push(dbNote);
+                    console.log(`Note "${title}" was modified after last sync, preserving`);
+                }
+            }
+        }
+
+        // STEP 2: Process client notes (add new/updated notes)
+        for (const [title, clientNote] of clientNotesMap.entries()) {
+            // Skip notes that were previously deleted
+            if (deletedNotesMap.has(title)) {
+                // Mark this device as having acknowledged the deletion
+                const deletedNote = deletedNotesMap.get(title)!;
+                if (!deletedNote.acknowledgedBy.includes(deviceId)) {
+                    deletedNote.acknowledgedBy.push(deviceId);
+                    console.log(`Device ${deviceId} acknowledged deletion of "${title}"`);
+                }
+                console.log(`Note "${title}" was previously deleted, ignoring from client`);
+                continue;
+            }
+
+            const dbNote = dbNotesMap.get(title);
             if (!dbNote) {
-                // New note - add to merged notes
                 mergedNotes.push(clientNote);
             } else if (clientNote.lastEditTime > dbNote.lastEditTime) {
-                // Client note is newer - use client version
                 mergedNotes.push(clientNote);
             } else {
-                // DB note is newer or same - use DB version
                 mergedNotes.push(dbNote);
             }
         }
 
-        // Handle DB notes not in client - use createdAtTime for better detection
+        // STEP 3: Add notes from the database that this device hasn't seen yet
         for (const [title, dbNote] of dbNotesMap.entries()) {
-            if (!clientNotesMap.has(title)) {
-                // Case 1: Note was created after last sync - it's new from another device
-                if (dbNote.createdAtTime > lastSyncedTime) {
-                    // This is definitely a new note from another device - preserve it
-                    mergedNotes.push(dbNote);
-                    console.log(`Note "${title}" is new from another device (created after last sync), preserving`);
-                }
-                // Case 2: Note existed before last sync, but was modified after last sync
-                else if (dbNote.lastEditTime > lastSyncedTime) {
-                    // The note was updated on another device after this device's last sync
-                    mergedNotes.push(dbNote);
-                    console.log(`Note "${title}" was updated on another device after last sync, preserving`);
-                }
-                // Case 3: Note existed before last sync and hasn't been modified since
-                else {
-                    // The note must have been intentionally deleted on this device
-                    deletedNoteTitles.push(title);
-                    console.log(
-                        `Note "${title}" existed at last sync, appears deleted on this device, marking for deletion`,
-                    );
-                }
+            if (clientNotesMap.has(title) || deletedNoteTitles.includes(title)) continue;
+            if (!previousNoteTitles.includes(title)) {
+                mergedNotes.push(dbNote);
+                console.log(`Note "${title}" is new for device ${deviceId}, adding to response`);
             }
         }
 
-        // Actually remove the notes marked for deletion
-        for (const title of deletedNoteTitles) {
-            console.log(`Removing note "${title}" from the merged notes`);
-            // Filter out the deleted notes
-            mergedNotes = mergedNotes.filter((note) => note.title !== title);
-        }
+        const currentNoteTitles = notes.map((note) => note.title);
 
-        // Update the database with the new deviceSync information
         const updatedDeviceSyncs = {
             ...deviceSyncs,
             [deviceId]: {
                 lastSyncedTime: currentTime,
+                previousNotes: currentNoteTitles,
             },
         };
 
-        // Log summary of changes
         console.log(`Sync summary for ${username}:`);
         console.log(`- ${notes.length} notes from client`);
         console.log(`- ${userNotes.length} notes in database`);
         console.log(`- ${mergedNotes.length} notes after merge`);
         console.log(`- ${deletedNoteTitles.length} notes marked for deletion`);
-        console.log(`- Previously synced: ${new Date(lastSyncedTime).toISOString()}`);
-        console.log(`- Current Sync Time (new lastSyncedTime): ${new Date(currentTime).toISOString()}`);
+
+        // Filter out notes that were marked for deletion
+        const finalNotes = mergedNotes.filter((note) => !deletedNoteTitles.includes(note.title));
+
+        // Get all known device IDs
+        const knownDeviceIds = Object.keys(updatedDeviceSyncs);
+
+        // Process deleted notes, keeping track of newly deleted notes
+        const updatedDeletedNotes: DeletedNote[] = [];
+        const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+
+        // Add newly deleted notes to the list
+        for (const title of deletedNoteTitles) {
+            // Skip if already in the list
+            if (deletedNotesMap.has(title)) continue;
+
+            updatedDeletedNotes.push({
+                title,
+                deletedAt: currentTime,
+                acknowledgedBy: [deviceId], // Initial device that performed the deletion
+            });
+        }
+
+        // Process existing deleted notes
+        deletedNotes.forEach((deletedNote) => {
+            // Skip if this is a newly deleted note we already added
+            if (deletedNoteTitles.includes(deletedNote.title)) return;
+
+            // Add current device to acknowledgedBy if it's not already there
+            if (!deletedNote.acknowledgedBy.includes(deviceId)) {
+                deletedNote.acknowledgedBy.push(deviceId);
+            }
+
+            // Check if all devices have acknowledged this deletion
+            const allDevicesAcknowledged = knownDeviceIds.every((id) => deletedNote.acknowledgedBy.includes(id));
+
+            // Check if the deletion is older than 30 days
+            const isOlderThan30Days = currentTime - deletedNote.deletedAt > THIRTY_DAYS_MS;
+
+            // If all devices acknowledged or it's older than 30 days, don't keep it
+            if (allDevicesAcknowledged) {
+                console.log(`All devices have acknowledged deletion of "${deletedNote.title}", removing from tracking`);
+                return;
+            }
+
+            if (isOlderThan30Days) {
+                console.log(`Deletion of "${deletedNote.title}" is older than 30 days, removing from tracking`);
+                return;
+            }
+
+            // Otherwise, keep tracking this deleted note
+            updatedDeletedNotes.push(deletedNote);
+        });
+
+        console.log(`- ${deletedNotes.length} previously tracked deleted notes`);
+        console.log(`- ${updatedDeletedNotes.length} deleted notes after cleanup`);
 
         // Save the merged notes back to the database
         await putRecord(NOTES_TABLE, {
             notesTableId: username,
             username,
-            notes: mergedNotes,
+            notes: finalNotes,
             deviceSyncs: updatedDeviceSyncs,
+            deletedNotes: updatedDeletedNotes,
         });
 
-        // Return the merged notes to the client
         return sendResponse({
-            notes: mergedNotes,
+            notes: finalNotes,
             lastSyncedTime: currentTime,
         });
     } catch (err) {
