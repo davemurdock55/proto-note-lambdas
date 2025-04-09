@@ -48,7 +48,7 @@ const generateToken = (username: User["username"], jwtSecret: string) => {
   if (!username) return null;
 
   return jwt.sign({ username }, jwtSecret, {
-    expiresIn: "1h",
+    expiresIn: "7d", // 7 days
   });
 };
 
