@@ -90,6 +90,7 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
         verified: true,
         message: 'success',
         username,
+        name: foundUser.name,
         token,
     });
 };
