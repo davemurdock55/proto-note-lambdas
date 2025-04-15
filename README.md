@@ -1,10 +1,20 @@
-# Proto-Note (Lambdas Backend)
+# Proto-Note Lambdas (Serverless Backend)
 
-A serverless application for user authentication and notes synchronization built with AWS SAM, Lambda, API Gateway, and DynamoDB.
+The serverless backend for custom user authentication and offline-first notes syncing built with AWS SAM, Lambda, API Gateway, and DynamoDB for the Proto-Note desktop and mobile applications.
 
-## Project Overview
+You don't need to download anything to test this one, as all the resources are currently deployed to my AWS account (as of April 2025), but you may deploy your own if you would like using my AWS SAM YAML Template (However, if you do, you would need to create your own databases for the `login-database` and `notes-database`).
 
-Proto-Note provides a complete serverless backend infrastructure for applications requiring user authentication and note synchronization. It features a comprehensive authentication system with JWT tokens and secure password handling, along with synchronization capabilities for notes across multiple devices.
+## What I Learned
+
+This is by far one of the parts of the application that took the most work. I built a custom authentication system from the ground up using AWS serverless resources, something I've never before done, including registering, logging-in, logging-out, verifying a user's token is still valid, and authorizing users to access some protected AWS Lambda functions.
+
+I also created a Lambda function to sync notes, using an offline first approach, meaning I had to find ways to track all CRUD operations for files in offline, local file-systems.
+
+In addition to all this, I had to learn how to build custom AWS Lambda Layers as well as build and deploy them using AWS SAM (a framework I have never before used).
+
+## Rest of the README
+
+The following portions of the README are information about the project, as well as some dev notes of things I found useful when developing in AWS SAM
 
 ## Architecture
 
