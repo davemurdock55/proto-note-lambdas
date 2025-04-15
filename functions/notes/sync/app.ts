@@ -94,7 +94,7 @@ export const lambdaHandler = async (event: APIGatewayProxyEvent): Promise<APIGat
             // Skip notes that were previously deleted
             if (deletedNotesMap.has(title)) {
                 // Mark this device as having acknowledged the deletion
-                const deletedNote = deletedNotesMap.get(title)!;
+                const deletedNote = deletedNotesMap.get(title) as DeletedNote;
                 if (!deletedNote.acknowledgedBy.includes(deviceId)) {
                     deletedNote.acknowledgedBy.push(deviceId);
                     console.log(`Device ${deviceId} acknowledged deletion of "${title}"`);
